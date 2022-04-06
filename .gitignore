@@ -453,3 +453,6 @@ bower_components
 
 ### WebSharper ###
 **/*.pdf
+
+# Secret environment variables
+.env
