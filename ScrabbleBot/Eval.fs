@@ -4,8 +4,18 @@ module internal Eval
 
     open StateMonad
 
-    let add a b = failwith "Not implemented"      
-    let div a b = failwith "Not implemented"      
+    (* Code for testing *)
+
+    let hello = [('H', 4); ('E', 1); ('L', 1); ('L', 1); ('O', 1)]
+    let state = mkState [("x", 5); ("y", 42)] hello ["_pos_"; "_result_"]
+    let emptyState = mkState [] [] []
+    let vowels = Set.ofList ['A'; 'E'; 'I'; 'O'; 'U'; 'Æ'; 'Ø'; 'Å']
+
+    let add a b = a >>= fun x -> b >>= fun y -> ret (x + y)
+    let sub a b = a >>= fun x -> b >>= fun y -> ret (x - y)
+    let mul a b = a >>= fun x -> b >>= fun y -> ret (x * y)
+    let div a b = a >>= fun x -> b >>= fun y -> if y <> 0 then ret (x / y) else fail DivisionByZero
+    let modulo a b = a >>= fun x -> b >>= fun y -> if y <> 0 then ret (x % y) else fail DivisionByZero
 
     type aExp =
         | N of int
@@ -37,7 +47,8 @@ module internal Eval
        | Conj of bExp * bExp  (* boolean conjunction *)
 
        | IsVowel of cExp      (* check for vowel *)
-       | IsConsonant of cExp  (* check for constant *)
+       | IsLetter of cExp     (* check for letter *)
+       | IsDigit of cExp      (* check for digit *)
 
     let (.+.) a b = Add (a, b)
     let (.-.) a b = Sub (a, b)
@@ -57,12 +68,38 @@ module internal Eval
     let (.>=.) a b = ~~(a .<. b)                (* numeric greater than or equal to *)
     let (.>.) a b = ~~(a .=. b) .&&. (a .>=. b) (* numeric greater than *)    
 
-    let arithEval a : SM<int> = failwith "Not implemented"      
+    let rec arithEval a : SM<int> = 
+        match a with
+        | N n -> ret n
+        | V v -> lookup v
+        | WL -> wordLength
+        | PV p -> arithEval p >>= pointValue
+        | Add (a1, a2) -> add (arithEval a1) (arithEval a2)
+        | Sub (a1, a2) -> sub (arithEval a1) (arithEval a2)
+        | Mul (a1, a2) -> mul (arithEval a1) (arithEval a2)
+        | Div (a1, a2) -> div (arithEval a1) (arithEval a2)
+        | Mod (a1, a2) -> modulo (arithEval a1) (arithEval a2)
+        | CharToInt c -> charEval c >>= (fun x -> ret (int x))
 
-    let charEval c : SM<char> = failwith "Not implemented"      
+    and charEval c : SM<char> = 
+        match c with
+        | C c -> ret c
+        | CV p -> arithEval p >>= characterValue
+        | ToUpper c -> charEval c >>= (fun x -> ret (System.Char.ToUpper x))
+        | ToLower c -> charEval c >>= (fun x -> ret (System.Char.ToLower x))
+        | IntToChar a -> arithEval a >>= (fun x -> ret (char x))
 
-    let boolEval b : SM<bool> = failwith "Not implemented"
-
+    let rec boolEval b : SM<bool> =
+        match b with
+        | TT -> ret true
+        | FF -> ret false
+        | AEq (a1, a2) -> (arithEval a1) >>= fun x -> (arithEval a2) >>= fun y -> ret (x = y)
+        | ALt (a1, a2) -> (arithEval a1) >>= fun x -> (arithEval a2) >>= fun y -> ret (x < y)
+        | Not b -> boolEval b >>= fun x -> ret (not x)
+        | Conj (a1, a2) -> (boolEval a1) >>= fun x -> (boolEval a2) >>= fun y -> ret (x && y)
+        | IsVowel c -> charEval c >>= fun x -> ret ((Set.contains x vowels))
+        | IsLetter c -> charEval c >>= fun x -> ret (System.Char.IsLetter x)
+        | IsDigit c -> charEval c >>= fun x -> ret (System.Char.IsDigit x)
 
     type stm =                (* statements *)
     | Declare of string       (* variable declaration *)
@@ -72,7 +109,32 @@ module internal Eval
     | ITE of bExp * stm * stm (* if-then-else statement *)
     | While of bExp * stm     (* while statement *)
 
-    let rec stmntEval stmnt : SM<unit> = failwith "Not implemented"
+    let rec stmntEval stmnt : SM<unit> = 
+        match stmnt with
+        | Declare v -> declare v
+        | Ass (v, a) -> (arithEval a) >>= update v 
+        | Skip -> ret ()
+        | Seq (s1, s2) -> stmntEval s1 >>= fun _ -> stmntEval s2
+        | ITE (b, s1, s2) -> (boolEval b) >>= fun x ->
+            if x then
+                push >>>=
+                stmntEval s1 >>>=
+                pop
+            else
+                push >>>=
+                stmntEval s2 >>>=
+                pop
+        | While (b, s) -> 
+            let rec loop (b_aux, s_aux) =
+                (boolEval b_aux) >>= fun x ->
+                if x then
+                    stmntEval s_aux >>>=
+                    loop (b_aux, s_aux)
+                else
+                    ret ()
+            push >>>=
+            loop (b, s) >>>=
+            pop
 
 (* Part 3 (Optional) *)
 
