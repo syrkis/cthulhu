@@ -1,4 +1,4 @@
-﻿namespace YourClientName
+﻿namespace Cthulhu
 
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication

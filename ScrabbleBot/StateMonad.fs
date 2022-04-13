@@ -1,6 +1,6 @@
 ﻿// Insert your StateMonad.fs from Assignment 6 here. All modules must be internal.
 
-module internal StateMonad
+module StateMonad
 
     type Error = 
         | VarExists of string

@@ -6,7 +6,7 @@
 module internal Parser
 
     open StateMonad
-    open ScrabbleUtil // NEW. KEEP THIS LINE.
+    //open ScrabbleUtil // NEW. KEEP THIS LINE.
     open System
     open Eval
     open FParsecLight.TextParser     // Industrial parser-combinator library. Use for Scrabble Project.
@@ -30,7 +30,7 @@ module internal Parser
     let pelse     = pstring "else" <?> "else"
     let pwhile    = pstring "while" <?> "while"
     let pdo       = pstring "do" <?> "do"
-    let pdeclare  = pstring "not implemented"
+    let pdeclare  = pstring "declare"
 
     let whitespaceChar = satisfy System.Char.IsWhiteSpace <?> "whitespace"
     let pletter        = satisfy System.Char.IsLetter <?> "letter"
@@ -45,18 +45,27 @@ module internal Parser
 
     // let parenthesise p = (pchar '(' .>> spaces) >>. p .>> (spaces >>. pchar ')')
     let parenthesise p = ((pchar '(' >*>. p) .>*> pchar ')')
+    let brackethise p = ((pchar '{' >*>. p) .>*> pchar '}')
     let pid = 
         let parser = ((pchar '_') <|> pletter) .>>. (many (palphanumeric <|> pchar '_'))
         let collectChars = fun x -> List.fold (fun acc char -> acc + (string char)) "" ((fst x) :: (snd x))
         parser |>> collectChars
 
-    let unop op a = (op .>>. spaces) >>. a
-    let binop op p1 p2 = (p1 .>> (spaces >>. op .>>. spaces)) .>>. p2
+    let unop op a = op >*>. a
+    let binop op p1 p2 = (p1 .>*>  op) .>*>. p2
 
     let TermParse, tref = createParserForwardedToRef<aExp>()
     let ProdParse, pref = createParserForwardedToRef<aExp>()
     let AtomParse, aref = createParserForwardedToRef<aExp>()
+
     let CharExpParse, cref = createParserForwardedToRef<cExp>()
+
+    let BoolExpParse, bref = createParserForwardedToRef<bExp>()
+    let Bool2ExpParse, b2ref = createParserForwardedToRef<bExp>()
+    let Bool3ExpParse, b3ref = createParserForwardedToRef<bExp>()
+
+    let StmExpParse, sref = createParserForwardedToRef<stm>()
+    let Stm1ExpParse, s1ref = createParserForwardedToRef<stm>()
 
     let AddParse = binop (pchar '+') ProdParse TermParse |>> Add <?> "Add"
     let SubParse = binop (pchar '-') ProdParse TermParse |>> Sub <?> "Sub"
@@ -80,23 +89,71 @@ module internal Parser
     let intToCharParse = pIntToChar >*>. AtomParse |>> IntToChar <?> "intToChar"
     let charToIntParse = pCharToInt >*>. (parenthesise CharExpParse) |>> CharToInt <?> "charToInt"
 
+    let logicalOr = fun (b1, b2) -> Not (Conj (Not (b1), Not (b2)))
+    let lte = fun b -> logicalOr (AEq (b), ALt (b))
+
+    let trueParse = pstring "true" |>> (fun _ -> TT) <?> "true"
+    let falseParse = pstring "false"  |>> (fun _ -> FF) <?> "false"
+    let andParse = binop (pstring @"/\") Bool2ExpParse BoolExpParse |>> Conj <?> "logical and"
+    let orParse = binop (pstring @"\/") Bool2ExpParse BoolExpParse |>> logicalOr <?> "logical or"
+    let notParse = unop (pchar '~') Bool3ExpParse |>> Not <?> "not"
+    let eqParse = binop (pchar '=') AtomParse TermParse |>> AEq <?> "equality"
+    let notEqParse = binop (pstring "<>") AtomParse TermParse |>> (fun a1 -> Not (AEq (a1)))  <?> "not equality"
+    let ltParse = binop (pchar '<') AtomParse TermParse |>> ALt <?> "less than"
+    let lteParse = binop (pstring "<=") AtomParse TermParse |>> lte <?> "less than or equal"
+    let gtParse = binop (pchar '>') AtomParse TermParse |>> (fun b -> Not (lte b)) <?> "greater than"
+    let gteParse = binop (pchar '>') AtomParse TermParse |>> (fun b -> Not (ALt (b))) <?> "greater than or equal"
+    let isDigitParse = unop pIsDigit CharExpParse |>> IsDigit
+    let isLetterParse = unop pIsLetter CharExpParse |>> IsLetter
+    let isVowelParse = unop pIsVowel CharExpParse |>> IsVowel
+    let bParParse = parenthesise BoolExpParse
+
+    let assignParse = (pid .>*> pstring ":=") .>*>. TermParse |>> Ass
+    let declareParse = (pdeclare >>. spaces1) >>. pid |>> Declare
+    let simcolParse = binop (pchar ';') Stm1ExpParse StmExpParse |>> Seq
+
+    let iteParse =  ((((pstring "if" >*>. bParParse) .>*> pstring "then") .>*>. 
+                    (brackethise Stm1ExpParse)) .>*> pstring "else") .>*>. 
+                    (brackethise Stm1ExpParse) |>> fun ((b,s1),s2) -> ITE (b,s1,s2)
+
+    let itParse =   ((pstring "if" >*>. bParParse) .>*> pstring "then") .>*>. 
+                    (brackethise Stm1ExpParse) |>> fun (b,s) -> ITE (b,s, Skip)
+
+    let whileParse = ((pstring "while" >*>. bParParse) .>*> pstring "do") .>*>. 
+                     (brackethise Stm1ExpParse) |>> While
+    
+// a := 7 + 5
     do tref.Value <- choice [AddParse; SubParse; ProdParse]
     do pref.Value <- choice [MulParse; DivParse; ModParse; AtomParse]
     do aref.Value <- choice [PVParse; NegParse; NParse; charToIntParse; VParse;  ParParse]
+
     do cref.Value <- choice [toUpperParse; toLowerParse; intToCharParse; CVParse; CParse]
+
+    do bref.Value <- choice [andParse; orParse; Bool2ExpParse]
+    do b2ref.Value <- choice [eqParse; notEqParse; ltParse; lteParse; gtParse; gteParse; Bool3ExpParse] 
+    do b3ref.Value <- choice [trueParse; falseParse; notParse;
+                             isDigitParse; isLetterParse; isVowelParse; bParParse]
+    do sref.Value <- choice [simcolParse; Stm1ExpParse]
+    do s1ref.Value <- choice [assignParse; declareParse; iteParse; itParse; whileParse]
 
     let AexpParse = TermParse 
 
-    let CexpParse = CharExpParse
+    let CexpParse = CharExpParse 
 
-    let BexpParse = pstring "not implemented"
+    let BexpParse = BoolExpParse 
 
-    let stmParse = pstring "not implemented"
-
+    let stmParse = StmExpParse
     (* The rest of your parser goes here *)
+    type coord = int * int
     type word   = (char * int) list
+    type squareProg = Map<int, string>
     type squareFun = word -> int -> int -> Result<int, Error>
     type square = Map<int, squareFun>
+
+    let parseSquareProg = fun sqp ->
+        let aux = fun _ value -> run stmParse value
+        match sqp with
+        | m -> Map.map () m
     
     type boardFun2 = coord -> Result<square option, Error>
         
@@ -106,5 +163,7 @@ module internal Parser
         squares       : boardFun2
     }
     
+(*
     // Default (unusable) board in case you are not implementing a parser for the DSL.
     let mkBoard : boardProg -> board = fun _ -> {center = (0,0); defaultSquare = Map.empty; squares = fun _ -> Success (Some Map.empty)}
+*)

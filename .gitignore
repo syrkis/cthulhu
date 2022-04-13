@@ -456,3 +456,5 @@ bower_components
 
 # Secret environment variables
 .env
+
+.ionide

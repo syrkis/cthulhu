@@ -5,10 +5,12 @@ module internal Parser
     open ScrabbleUtil
     open StateMonad
     
+    type coord = int * int
     type word   = (char * int) list
+    type squareProg = Map<int, string>
     type squareFun = word -> int -> int -> Result<int, Error>
     type square = Map<int, squareFun>
-    
+
     type boardFun2 = coord -> Result<square option, Error>
         
     type board = {
