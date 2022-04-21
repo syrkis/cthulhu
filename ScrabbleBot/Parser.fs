@@ -3,7 +3,7 @@
 
 // Insert your Parser.fs file here from Assignment 7. All modules must be internal.
 
-module Parser
+module internal Parser
 
     open StateMonad
     //open ScrabbleUtil // NEW. KEEP THIS LINE.
@@ -150,6 +150,7 @@ module Parser
     type squareFun = word -> int -> int -> Result<int, Error>
     type square = Map<int, squareFun>
 
+(*
     type boardProg = {
         prog : string;
         squares : Map<int, squareProg>
@@ -158,7 +159,7 @@ module Parser
         isInfinite : bool // For pretty-printing purposes only
         ppSquare : string // For pretty-printing purposes only
     }
-
+*)
     let parseSquareProg sqp = 
         let aux = fun _ prog -> run stmParse prog |> getSuccess |> stmntToSquareFun 
         match sqp with
@@ -178,7 +179,7 @@ module Parser
     
     // Default (unusable) board in case you are not implementing a parser for the DSL.
     //let mkBoard : boardProg -> board = fun _ -> {center = (0,0); defaultSquare = Map.empty; squares = fun _ -> Success (Some Map.empty)}
-    let mkBoard (bp: boardProg) = 
+    let mkBoard (bp: ScrabbleUtil.boardProg) = 
         let mprime = Map.map (fun _ sqp -> parseSquareProg sqp) bp.squares
         {center = bp.center;
             defaultSquare = Map.find bp.usedSquare mprime;

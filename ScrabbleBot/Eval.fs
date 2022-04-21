@@ -1,6 +1,6 @@
 ﻿// Insert your updated Eval.fs file here from Assignment 7. All modules must be internal.
 
-module Eval
+module internal Eval
 
     open StateMonad
 
@@ -163,11 +163,7 @@ module Eval
         let state = mkState [("_pos_", pos); ("_acc_", acc); ("_result_",0)] w ["_acc_"; "_pos_"; "_result_"]
         stmntEval stm >>>= lookup "_result_" |> evalSM state
 
-
-
-
     type coord = int * int
-
     type boardFun = coord -> Result<squareFun option, Error> 
 
     let stmntToBoardFun stm m = fun coord -> 
