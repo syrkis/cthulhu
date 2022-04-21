@@ -1,6 +1,6 @@
 ﻿// Insert your updated Eval.fs file here from Assignment 7. All modules must be internal.
 
-module internal Eval
+module Eval
 
     open StateMonad
 
@@ -159,14 +159,23 @@ module internal Eval
     type word = (char * int) list
     type squareFun = word -> int -> int -> Result<int, Error>
 
-    let stmntToSquareFun stm = failwith "Not implemented"
+    let stmntToSquareFun stm = fun w pos acc -> 
+        let state = mkState [("_pos_", pos); ("_acc_", acc); ("_result_",0)] w ["_acc_"; "_pos_"; "_result_"]
+        stmntEval stm >>>= lookup "_result_" |> evalSM state
+
+
 
 
     type coord = int * int
 
     type boardFun = coord -> Result<squareFun option, Error> 
 
-    let stmntToBoardFun stm m = failwith "Not implemented"
+    let stmntToBoardFun stm m = fun coord -> 
+        let state = mkState [("_x_", fst coord); ("_y_", snd coord); ("_result_",0)] [] ["_x_";"_y_";"_result_"]
+        let res = stmntEval stm >>>= lookup "_result_" |> evalSM state
+        match res with
+        | Success result_val -> Map.tryFind result_val m |> Success
+        | Failure err -> Failure err
 
     type board = {
         center        : coord
