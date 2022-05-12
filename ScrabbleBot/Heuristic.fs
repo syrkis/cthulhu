@@ -74,6 +74,7 @@ module internal Heuristic =
                 
             let checkCoord = fun cands co cid ->
                 match co with
+                    | co when cid = 0u -> cands
                     | (x0, y0) when not (Map.containsKey (x0+1,y0) placedChars) && not (Map.containsKey (x0-1,y0) placedChars) -> 
                         // add with bool Right
                         match dingDongSize (x0,y0) direction.Right with
