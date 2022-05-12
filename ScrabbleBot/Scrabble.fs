@@ -59,7 +59,8 @@ module State =
                                     hand = h;
                                     playerTurn = pt;
                                     active = true;
-                                    playerCount = pc}
+                                    playerCount = pc;
+                                    }
 
     let board st         = st.board
     let dict st          = st.dict
@@ -71,30 +72,31 @@ module Scrabble =
     
     let incTurn (st: State.state) = {st with playerTurn = (if st.playerTurn = st.playerCount then 1u else st.playerTurn + 1u)}
 
-    let playTurn (st: State.state) cstream pieces = 
-        let candidates = Heuristic.findAnchorPoints st.placedChars
-        //printfn "%A" candidates
-        // printfn "%A" st.placedChars
+    let playTurn (pre_st: State.state) cstream pieces = 
+        let st = {pre_st with hand = MultiSet.remove 0u 7u pre_st.hand }
+    
+        st.board.center |> printfn "center: %A"
         Print.printHand pieces st.hand
-        let chosen_word = Heuristic.chooseWord candidates st.dict st.hand
-        printfn "%A" chosen_word
+
+        let chosen_word =
+            match st.placedChars.IsEmpty with
+            | true -> Heuristic.playFirstTurn st.board.center st.hand st.dict
+            | false ->
+                let candidates = Heuristic.findAnchorPoints st.placedChars
+                Heuristic.chooseWord candidates st.dict st.hand
+
+        printfn "Chosen word: %A" chosen_word        
+        //let _ = System.Console.ReadLine()
+
         match chosen_word with
-        | None -> ()
+        | None ->
+            send cstream (SMChange [(Heuristic.changeHand pre_st.hand)])
         | Some (co, wo, dir) -> 
-            printfn "PLAYING MOVE: %A" (Heuristic.formatMove co wo dir)
-            ()
-        
-
-        // remove the force print when you move on from manual input (or when you have learnt the format)
-        forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
-        let input =  System.Console.ReadLine()
-        let move = RegEx.parseMove input
-
-        printf "Player %d -> Server:\n%A\n" (State.playerNumber st) move // keep the debug lines. They are useful.
-        send cstream (SMPlay move)
+            let move = Heuristic.formatMove co wo dir st.placedChars.IsEmpty
+            send cstream (SMPlay move)
+            printf "Player %d -> Server:\n%A\n" (State.playerNumber st) move // keep the debug lines. They are useful.
 
         let msg = recv cstream
-        printf "Player %d <- Server:\n%A\n" (State.playerNumber st) move // keep the debug lines. They are useful.
 
         match msg with
         | RCM (CMPlaySuccess(ms, points, newPieces)) ->
@@ -110,17 +112,21 @@ module Scrabble =
             (* Failed play. Update your state *)
             let st' = st // This state needs to be updated
             st'
+        | RCM (CMChangeSuccess ls) ->
+            let st_tile_removed = {st with hand = MultiSet.removeSingle ((Heuristic.changeHand pre_st.hand)) st.hand} 
+            let st_tile_add = {st_tile_removed with hand = MultiSet.addSingle (fst ls.[0]) st_tile_removed.hand} 
+            st_tile_add
         | RCM (CMGameOver _) -> {st with active=false}
-        | RCM a -> failwith (sprintf "not implmented: %A" a)
+        | RCM _ -> st
+        //| RCM a -> failwith (sprintf "not implmented: %A" a)
         | RGPE err -> printfn "Gameplay Error:\n%A" err; st
-            
+
     let passTurn (st: State.state) cstream pieces = 
         let msg = recv cstream
         printf "Player %d <- Server:\n%A\n" (State.playerNumber st) msg // keep the debug lines. They are useful.
 
         match msg with
         | RCM (CMPlayed (pid, ms, points)) ->
-            
             let st' = {st with placedChars = (Heuristic.registerPlacement ms st.placedChars)} 
             (* Successful play by other player. Update your state *)
             st'
@@ -128,8 +134,11 @@ module Scrabble =
             (* Failed play. Update your state *)
             st
         | RCM (CMGameOver _) -> {st with active=false}
-        | RCM a -> failwith (sprintf "not implmented: %A" a)
+        | RCM (CMChange _) -> st
+        | RCM _ -> st
+        //| RCM a -> failwith (sprintf "not implmented: %A" a)
         | RGPE err -> printfn "Gameplay Error:\n%A" err; st
+        
 
     let playGame cstream pieces (st : State.state) =
         let rec aux (st : State.state) =

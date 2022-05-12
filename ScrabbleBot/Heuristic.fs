@@ -10,19 +10,21 @@ open ScrabbleUtil.DebugPrint
 module internal Heuristic =
 
     let charMap = 
-        let nums = List.map (fun x -> uint32 x) [1..26]
-        let chars = ['A'..'Z']
+        let nums = List.map (fun x -> uint32 x) [0..26]
+        let chars = 'Ø'::['A'..'Z']
         Map.ofList (List.zip nums chars)
     
     let charIdMap = 
-        let nums = List.map (fun x -> uint32 x) [1..26]
-        let chars = ['A'..'Z']
+        let nums = List.map (fun x -> uint32 x) [0..26]
+        let chars = 'Ø'::['A'..'Z']
         Map.ofList (List.zip chars nums)
 
     let charPointMap =
-        let nums = List.map (fun x -> uint32 x) [1..26]
-        let points = [1; 3; 3; 2; 1; 4; 2; 4; 1; 8; 5; 1; 3; 1; 1; 3; 10; 1; 1; 1; 1; 4; 4; 8; 4; 10]
+        let nums = List.map (fun x -> uint32 x) [0..26]  // TODO fix fix
+        let points = [0; 1; 3; 3; 2; 1; 4; 2; 4; 1; 8; 5; 1; 3; 1; 1; 3; 10; 1; 1; 1; 1; 4; 4; 8; 4; 10]
         Map.ofList (List.zip nums points)
+
+    let letterFreq = ['E'; 'M'; 'A'; 'H'; 'R'; 'G'; 'I'; 'B'; 'O'; 'F'; 'T'; 'Y'; 'N'; 'W'; 'S'; 'K'; 'L'; 'V'; 'C'; 'X'; 'U'; 'Z'; 'D'; 'J'; 'P'; 'Q'; 'Ø']
 
     let getChar cid = Map.find cid charMap
     let getCharId c = Map.find c charIdMap
@@ -134,7 +136,7 @@ module internal Heuristic =
 
     let addPair (x0, y0) (x1, y1) = (x0+x1, y0+y1)
 
-    let formatMove coord (word: list<char>) direction = 
+    let formatMove coord (word: list<char>) direction includeFirst = 
         let dir_vec =
             match direction with
             | direction.Right -> (1,0)
@@ -149,13 +151,42 @@ module internal Heuristic =
                     let cid = (getCharId x)
                     let points = getCharPoints cid
                     aux new_co xs (
-                        String.concat " " [
-                            string (fst new_co);
-                            string (snd new_co);
-                            string cid + (string x) + (string points)
-                        ]::move
+                        (
+                            new_co,
+                            (cid,
+                                (x, points)
+                            )
+                        )::move
                     )
                 | [] -> move
-            aux coord word.[1..] []
+            match includeFirst with
+            | true -> aux (addPair coord (-1, 0)) word []
+            | false -> aux coord word.[1..] []
 
-        String.concat " " tile_placements
+        tile_placements
+
+    let playFirstTurn (centerCoord: int*int) hand (dic: Dictionary.Dict) = 
+        let folderFunc best_word cid _ = 
+            let anchorPoint = Map.ofList [(centerCoord, (cid, 7, direction.Right))]
+            let best_anchor_word = chooseWord anchorPoint dic (MultiSet.removeSingle cid hand)
+            match best_anchor_word with
+            | None -> best_word
+            | Some (co, word, direc) -> 
+                match best_word with 
+                | None -> Some (co, word, direc)
+                | Some (b_co, b_word, b_direc) ->
+                    if List.length word >= List.length b_word then 
+                        Some (co, word, direc)
+                    else 
+                        best_word
+
+        MultiSet.fold folderFunc None hand
+
+    let changeHand hand =
+        List.fold (
+            fun acc letter -> 
+                let letterId = getCharId letter
+                match MultiSet.contains letterId hand with
+                | true -> letterId
+                | false -> acc
+            ) 69u letterFreq

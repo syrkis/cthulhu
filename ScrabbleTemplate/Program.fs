@@ -28,12 +28,12 @@ let main argv =
     System.Console.Clear()
 
 
-    let board        = ScrabbleUtil.StandardBoard.standardBoard ()
+//    let board        = ScrabbleUtil.StandardBoard.standardBoard ()
 //    let board      = ScrabbleUtil.InfiniteBoard.infiniteBoard ()
 
 //    let board      = ScrabbleUtil.RandomBoard.randomBoard ()
 //    let board      = ScrabbleUtil.RandomBoard.randomBoardSeed (Some 42)
-//    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoard ()
+    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoard ()
 //    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoardSeed (Some 42)
 
 //    let board      = ScrabbleUtil.HoleBoard.holeBoard ()
@@ -53,13 +53,13 @@ let main argv =
         Some (Dictionary.empty, Dictionary.insert, Dictionary.step, None) 
 
     // Uncomment this line to call your client
-    //let players    = [("Bob", Cthulhu.Scrabble.startGame)]
     let (dictionary, time) =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict words dictAPI)
+    //let players = [("Bob", Cthulhu.Scrabble.startGame), ("OxyFis", Oxyphenbutazone.Scrabble.startGame)]
 
-    //let players = spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 4
-    let players = spawnMultiples "Bob" dictionary Cthulhu.Scrabble.startGame 2
-
+    let players_0 = spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 1
+    let players_1 = spawnMultiples "Bob" dictionary Cthulhu.Scrabble.startGame 1
+    let players = players_0 @ players_1
 
     do ScrabbleServer.Comm.startGame 
           board dictionary handSize timeout tiles seed port players
