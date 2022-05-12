@@ -78,6 +78,12 @@ module Scrabble =
         Print.printHand pieces st.hand
         let chosen_word = Heuristic.chooseWord candidates st.dict st.hand
         printfn "%A" chosen_word
+        match chosen_word with
+        | None -> ()
+        | Some (co, wo, dir) -> 
+            printfn "PLAYING MOVE: %A" (Heuristic.formatMove co wo dir)
+            ()
+        
 
         // remove the force print when you move on from manual input (or when you have learnt the format)
         forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"

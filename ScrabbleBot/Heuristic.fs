@@ -14,12 +14,23 @@ module internal Heuristic =
         let chars = ['A'..'Z']
         Map.ofList (List.zip nums chars)
     
+    let charIdMap = 
+        let nums = List.map (fun x -> uint32 x) [1..26]
+        let chars = ['A'..'Z']
+        Map.ofList (List.zip chars nums)
+
+    let charPointMap =
+        let nums = List.map (fun x -> uint32 x) [1..26]
+        let points = [1; 3; 3; 2; 1; 4; 2; 4; 1; 8; 5; 1; 3; 1; 1; 3; 10; 1; 1; 1; 1; 4; 4; 8; 4; 10]
+        Map.ofList (List.zip nums points)
+
     let getChar cid = Map.find cid charMap
+    let getCharId c = Map.find c charIdMap
+    let getCharPoints cid = Map.find cid charPointMap
 
     type direction = 
         | Right = 0
         | Down = 1
-        
 
     // Adds placement of word into placedChars
     let registerPlacement : list<coord * (uint32 * (char * int))> -> Map<coord, uint32> -> Map<coord, uint32> = 
@@ -80,7 +91,6 @@ module internal Heuristic =
 
         let maxWord ls1 ls2 = if List.length ls1 > List.length ls2 then ls1 else ls2
 
-        
         let longestWord anc_cid len = 
             let rec search c (isWord, subd) subhand depth =
                 let compare best_found cid _ = 
@@ -88,9 +98,6 @@ module internal Heuristic =
                     match Dictionary.step sub_c subd with
                     | Some (b, d') ->
                         let subsubhand = MultiSet.removeSingle cid subhand
-                        //printfn "%A" subhand
-                        //printfn "%A" subsubhand
-                        //printfn ""
                         let found = search sub_c (b, d') subsubhand (depth+1)
                         maxWord found best_found
                     | None -> best_found
@@ -125,7 +132,30 @@ module internal Heuristic =
 
         Map.fold anchorFolder None anchorPoints
 
-        
-        
+    let addPair (x0, y0) (x1, y1) = (x0+x1, y0+y1)
 
+    let formatMove coord (word: list<char>) direction = 
+        let dir_vec =
+            match direction with
+            | direction.Right -> (1,0)
+            | direction.Down -> (0,1)
+            | _ -> failwith "Invalid direction"
+        
+        let tile_placements = 
+            let rec aux co wo move =
+                match wo with
+                | x::xs -> 
+                    let new_co = addPair co dir_vec
+                    let cid = (getCharId x)
+                    let points = getCharPoints cid
+                    aux new_co xs (
+                        String.concat " " [
+                            string (fst new_co);
+                            string (snd new_co);
+                            string cid + (string x) + (string points)
+                        ]::move
+                    )
+                | [] -> move
+            aux coord word.[1..] []
 
+        String.concat " " tile_placements
