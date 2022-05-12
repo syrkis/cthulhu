@@ -42,6 +42,7 @@ module State =
     // information, such as number of players, player turn, etc.
 
     type state = {
+        placedChars   : Map<coord, uint32> 
         board         : Parser.board
         dict          : ScrabbleUtil.Dictionary.Dict
         playerNumber  : uint32
@@ -51,7 +52,8 @@ module State =
         active        : bool
     }
 
-    let mkState b d pn h pt pc = {board = b;
+    let mkState b d pn h pt pc = {placedChars = Map.empty;
+                                    board = b;
                                     dict = d;
                                     playerNumber = pn;
                                     hand = h;
@@ -70,8 +72,13 @@ module Scrabble =
     let incTurn (st: State.state) = {st with playerTurn = (if st.playerTurn = st.playerCount then 1u else st.playerTurn + 1u)}
 
     let playTurn (st: State.state) cstream pieces = 
-
+        let candidates = Heuristic.findAnchorPoints st.placedChars
+        //printfn "%A" candidates
+        // printfn "%A" st.placedChars
         Print.printHand pieces st.hand
+        let chosen_word = Heuristic.chooseWord candidates st.dict st.hand
+        printfn "%A" chosen_word
+
         // remove the force print when you move on from manual input (or when you have learnt the format)
         forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
         let input =  System.Console.ReadLine()
@@ -91,7 +98,7 @@ module Scrabble =
             let auxAdd = fun state (uid, count) -> MultiSet.add uid count state
             let new_hand = List.fold auxRemove st.hand removedTiles
             let new_hand2 = List.fold auxAdd new_hand newPieces
-            let st' = {st with hand = new_hand2 } 
+            let st' = {st with hand = new_hand2; placedChars = (Heuristic.registerPlacement ms st.placedChars) } 
             st'
         | RCM (CMPlayFailed (pid, ms)) ->
             (* Failed play. Update your state *)
@@ -107,8 +114,10 @@ module Scrabble =
 
         match msg with
         | RCM (CMPlayed (pid, ms, points)) ->
+            
+            let st' = {st with placedChars = (Heuristic.registerPlacement ms st.placedChars)} 
             (* Successful play by other player. Update your state *)
-            st
+            st'
         | RCM (CMPlayFailed (pid, ms)) ->
             (* Failed play. Update your state *)
             st
