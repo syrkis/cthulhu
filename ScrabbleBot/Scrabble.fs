@@ -82,8 +82,8 @@ module Scrabble =
                 let candidates = Heuristic.findAnchorPoints st.placedChars st.board.squares
                 Heuristic.chooseWord candidates st.dict st.hand
 
-        printfn "Chosen word: %A" chosen_word        
-        let _ = System.Console.ReadLine()
+        // printfn "Chosen word: %A" chosen_word
+        // let _ = System.Console.ReadLine()
 
         match chosen_word with
         | None ->
@@ -116,7 +116,7 @@ module Scrabble =
         | RCM (CMGameOver _) -> {st with active=false}
         | RCM _ -> st
         //| RCM a -> failwith (sprintf "not implmented: %A" a)
-        | RGPE err -> printfn "Gameplay Error:\n%A" err; st
+        | RGPE err -> st //printfn "Gameplay Error:\n%A" err; st
 
     let passTurn (st: State.state) cstream pieces = 
         let msg = recv cstream
@@ -134,7 +134,7 @@ module Scrabble =
         | RCM (CMChange _) -> st
         | RCM _ -> st
         //| RCM a -> failwith (sprintf "not implmented: %A" a)
-        | RGPE err -> printfn "Gameplay Error:\n%A" err; st
+        | RGPE err -> st // printfn "Gameplay Error:\n%A" err; st
         
 
     let playGame cstream pieces (st : State.state) =
@@ -159,12 +159,12 @@ module Scrabble =
             (timeout : uint32 option) 
             (cstream : Stream) =
         
-        printf "Starting game!
-                    number of players = %d
-                    player id = %d
-                    player turn = %d
-                    hand =  %A
-                    timeout = %A\n\n" numPlayers playerNumber playerTurn hand timeout
+        // printf "Starting game!
+        //             number of players = %d
+        //             player id = %d
+        //             player turn = %d
+        //             hand =  %A
+        //             timeout = %A\n\n" numPlayers playerNumber playerTurn hand timeout
 
         //let dict = dictf true // Uncomment if using a gaddag for your dictionary
         let dict = dictf false // Uncomment if using a trie for your dictionary
