@@ -7,6 +7,9 @@ open System.IO
 
 open ScrabbleUtil.DebugPrint
 
+open Parser
+open StateMonad
+
 module internal Heuristic =
 
     let charMap = 
@@ -20,7 +23,7 @@ module internal Heuristic =
         Map.ofList (List.zip chars nums)
 
     let charPointMap =
-        let nums = List.map (fun x -> uint32 x) [0..26]  // TODO fix fix
+        let nums = List.map (fun x -> uint32 x) [0..26]
         let points = [0; 1; 3; 3; 2; 1; 4; 2; 4; 1; 8; 5; 1; 3; 1; 1; 3; 10; 1; 1; 1; 1; 4; 4; 8; 4; 10]
         Map.ofList (List.zip nums points)
 
@@ -41,7 +44,7 @@ module internal Heuristic =
             List.fold folder placedChars move
 
     let findAnchorPoints =
-        fun placedChars -> 
+        fun placedChars (boardFun: coord -> Result<square option, Error>) ->
 
             // Map<coord, uint32 * uint32 * direction> 
             // value is cid * length * dir
@@ -53,13 +56,19 @@ module internal Heuristic =
                 let inProxy (x0,y0) d =
                     match direc with
                     | direction.Down -> 
-                        Map.containsKey (x0+1,y0+d) placedChars ||
-                        Map.containsKey (x0-1,y0+d) placedChars ||
-                        Map.containsKey (x0,y0+d+1) placedChars
-                    | direction.Right -> 
-                        Map.containsKey (x0+d,y0+1) placedChars ||
-                        Map.containsKey (x0+d,y0-1) placedChars ||
-                        Map.containsKey (x0+d+1,y0) placedChars
+                        match (boardFun (x0,y0+d)) with
+                        | Success (None) -> true
+                        | _ ->
+                            Map.containsKey (x0+1,y0+d) placedChars ||
+                            Map.containsKey (x0-1,y0+d) placedChars ||
+                            Map.containsKey (x0,y0+d+1) placedChars
+                    | direction.Right ->
+                        match (boardFun (x0+d,y0)) with
+                        | Success (None) -> true
+                        | _ ->
+                            Map.containsKey (x0+d,y0+1) placedChars ||
+                            Map.containsKey (x0+d,y0-1) placedChars ||
+                            Map.containsKey (x0+d+1,y0) placedChars
                     | _ -> failwith "Invalid direction"
 
                 let rec whenHit = fun (x0,y0) delta ->
