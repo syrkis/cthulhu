@@ -16,8 +16,9 @@ module Dictionary
             let existing = if Map.containsKey x.[0] d then Map.find x.[0] d else Leaf (false, x.[0])
             Node (b, s, Map.add x.[0] (insert x.[1..] existing) d)
 
-    let rec lookup (x: string) =
-        function
+    let rec lookup (x: string) dic =
+        printf "lookup is called\n"
+        match dic with
         | Leaf (b, _) when x.Equals "" -> b
         | Node (b, _, _) when x.Equals "" -> b
 

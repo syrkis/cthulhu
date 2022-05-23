@@ -9,6 +9,9 @@ open ScrabbleUtil.DebugPrint
 
 module internal Heuristic =
 
+    let charMapNoJoker = 
+        let nums = List.map (fun x -> uint32 x) [1..26]
+        Map.ofList (List.zip nums nums)
     let charMap = 
         let nums = List.map (fun x -> uint32 x) [0..26]
         let chars = 'Ø'::['A'..'Z']
@@ -73,6 +76,7 @@ module internal Heuristic =
                 (whenHit co 1) - 1 
                 
             let checkCoord = fun cands co cid ->
+                // printfn "chechCoord co: %A" co
                 match co with
                     | co when cid = 0u -> cands
                     | (x0, y0) when not (Map.containsKey (x0+1,y0) placedChars) && not (Map.containsKey (x0-1,y0) placedChars) -> 
@@ -90,20 +94,23 @@ module internal Heuristic =
             Map.fold checkCoord anchorCandidates placedChars
             
 
-    let chooseWord anchorPoints (dic: Dictionary.Dict) hand =  
+    let chooseWord anchorPoints (dic: Dictionary.Dict) hand work =  
 
         let maxWord ls1 ls2 = if List.length ls1 > List.length ls2 then ls1 else ls2
 
         let longestWord anc_cid len = 
             let rec search c (isWord, subd) subhand depth =
                 let compare best_found cid _ = 
-                    let sub_c = getChar cid
-                    match Dictionary.step sub_c subd with
-                    | Some (b, d') ->
-                        let subsubhand = MultiSet.removeSingle cid subhand
-                        let found = search sub_c (b, d') subsubhand (depth+1)
-                        maxWord found best_found
-                    | None -> best_found
+                    match cid with
+                    | 0u -> best_found
+                    | cid -> 
+                        let sub_c = getChar cid
+                        match Dictionary.step sub_c subd with
+                        | Some (b, d') ->
+                            let subsubhand = MultiSet.removeSingle cid subhand
+                            let found = search sub_c (b, d') subsubhand (depth+1)
+                            maxWord found best_found
+                        | None -> best_found
 
                 match depth with
                 | d when d < len  -> 
@@ -120,6 +127,7 @@ module internal Heuristic =
             | None -> failwith "massive error, dic should contain all letters"
 
         let anchorFolder best_word co (anc_cid, len, direc) = 
+            // printfn "anchorFolder co: %A" co
             let best_anchor_word = longestWord anc_cid len
             match best_anchor_word with
             | [] -> best_word
@@ -132,8 +140,9 @@ module internal Heuristic =
                         best_word 
                 | None -> Some (co, anc_word, direc)
 
-
-        Map.fold anchorFolder None anchorPoints
+        match work with
+        | true -> Map.fold anchorFolder None anchorPoints
+        | false -> None
 
     let addPair (x0, y0) (x1, y1) = (x0+x1, y0+y1)
 
@@ -169,7 +178,7 @@ module internal Heuristic =
     let playFirstTurn (centerCoord: int*int) hand (dic: Dictionary.Dict) = 
         let folderFunc best_word cid _ = 
             let anchorPoint = Map.ofList [(centerCoord, (cid, 7, direction.Right))]
-            let best_anchor_word = chooseWord anchorPoint dic (MultiSet.removeSingle cid hand)
+            let best_anchor_word = chooseWord anchorPoint dic (MultiSet.removeSingle cid hand) true
             match best_anchor_word with
             | None -> best_word
             | Some (co, word, direc) -> 
@@ -191,3 +200,86 @@ module internal Heuristic =
                 | true -> letterId
                 | false -> acc
             ) 69u letterFreq
+    
+    // Just attempt to place any tile anywhere
+    let panicFind hand placedChars dic =
+
+        let rec traverseLeft x y acc =
+            match Map.tryFind (x,y) placedChars with
+            | Some cid -> traverseLeft (x-1) y ((getChar cid)::acc)
+            | None -> acc 
+
+        let rec traverseRight x y acc =
+            match Map.tryFind (x,y) placedChars with
+            | Some cid -> traverseRight (x+1) y ((getChar cid)::acc)
+            | None -> acc
+
+        let rec traverseUp x y acc =
+            match Map.tryFind (x,y) placedChars with
+            | Some cid -> traverseLeft x (y-1) ((getChar cid)::acc)
+            | None -> acc
+
+        let rec traverseDown x y acc =
+            match Map.tryFind (x,y) placedChars with
+            | Some cid -> traverseLeft x (y+1) ((getChar cid)::acc)
+            | None -> acc
+        
+        let tryPlace cid prev co = 
+            printf "Trying to place %A at coordinat %A\n" cid co
+            match prev with
+            | Some x -> Some x
+            | None -> 
+                let lw = traverseLeft ((fst co) + 1) (snd co) []
+                let rw = traverseRight ((fst co) + 1) (snd co) [] |> List.rev
+                let w_l1 = lw @ ((getChar cid)::rw)
+                let w1 = if (List.length w_l1) > 1 then System.String.Concat(Array.ofList(w_l1))  else "YAWS"
+                printf "\t making word %A %A %A\n" lw rw w1
+                match Dictionary.lookup w1 dic with
+                | true -> 
+                    let uw = traverseUp (fst co) ((snd co) - 1) []
+                    let dw = traverseDown (fst co) ((snd co) + 1) [] |> List.rev
+                    let w_l2 = uw @ ((getChar cid)::dw)
+                    let w2 = if (List.length w_l2) > 1 then System.String.Concat(Array.ofList(w_l2))  else "HELLO"
+                    printf "\t\t making word %A %A %A\n" uw dw w2
+                    match Dictionary.lookup w2 dic with
+                    | true -> Some co
+                    | false -> None
+                | false -> None
+                
+        let allCoord =
+            let above = Map.keys placedChars |> Seq.map (fun (x,y) -> (x,y-1)) |> List.ofSeq
+            let below = Map.keys placedChars |> Seq.map (fun (x,y) -> (x,y+1)) |> List.ofSeq
+            let right = Map.keys placedChars |> Seq.map (fun (x,y) -> (x+1,y)) |> List.ofSeq
+            let left  = Map.keys placedChars |> Seq.map (fun (x,y) -> (x-1,y)) |> List.ofSeq
+            let all = above @ below @ right @ left
+            List.filter (fun co -> not (Map.containsKey co placedChars)) all
+
+        let rec tryChar prev (cid: uint32) _  =
+            match prev with
+            | Some (co,c_id,is_joker) -> Some (co, c_id, is_joker)
+            | None ->
+                match cid with
+                | 0u -> 
+                    let found = Map.fold tryChar None charMapNoJoker
+                    match found with
+                    | Some (co, c_id, _) -> Some (co, c_id, true)
+                    | None -> None
+                | cid -> 
+                    match List.fold (tryPlace cid) None allCoord with
+                    | Some co -> Some (co, cid, false)
+                    | None -> None
+
+        let ans = MultiSet.fold tryChar None hand
+        match ans with
+        | None -> None
+        | Some (co, cid, is_joker) ->
+            let points = if is_joker then 0 else (getCharPoints cid)
+            let c = getChar cid
+            let real_cid = if is_joker then 0u else cid
+            Some [(co,(real_cid, (c, points)))]
+
+
+            
+
+
+

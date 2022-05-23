@@ -72,8 +72,7 @@ module Scrabble =
     
     let incTurn (st: State.state) = {st with playerTurn = (if st.playerTurn = st.playerCount then 1u else st.playerTurn + 1u)}
 
-    let playTurn (pre_st: State.state) cstream pieces = 
-        let st = {pre_st with hand = MultiSet.remove 0u 7u pre_st.hand }
+    let playTurn (st: State.state) cstream pieces = 
     
         st.board.center |> printfn "center: %A"
         Print.printHand pieces st.hand
@@ -83,14 +82,26 @@ module Scrabble =
             | true -> Heuristic.playFirstTurn st.board.center st.hand st.dict
             | false ->
                 let candidates = Heuristic.findAnchorPoints st.placedChars
-                Heuristic.chooseWord candidates st.dict st.hand
+                Heuristic.chooseWord candidates st.dict st.hand true
 
         printfn "Chosen word: %A" chosen_word        
         //let _ = System.Console.ReadLine()
+        
+        printf "placedChars %A" st.placedChars
 
         match chosen_word with
         | None ->
-            send cstream (SMChange [(Heuristic.changeHand pre_st.hand)])
+            System.Threading.Thread.Sleep 100
+            let ans = Heuristic.panicFind st.hand st.placedChars st.dict
+            printf "Panicked and found %A" ans
+            let _ = System.Console.ReadLine()
+            match ans with
+            | None -> 
+                send cstream (SMChange [(Heuristic.changeHand st.hand)])
+            | Some m-> 
+                send cstream (SMPlay m)
+                printf "Player %d -> Server:\n%A\n" (State.playerNumber st) m // keep the debug lines. They are useful.
+
         | Some (co, wo, dir) -> 
             let move = Heuristic.formatMove co wo dir st.placedChars.IsEmpty
             send cstream (SMPlay move)
@@ -113,7 +124,7 @@ module Scrabble =
             let st' = st // This state needs to be updated
             st'
         | RCM (CMChangeSuccess ls) ->
-            let st_tile_removed = {st with hand = MultiSet.removeSingle ((Heuristic.changeHand pre_st.hand)) st.hand} 
+            let st_tile_removed = {st with hand = MultiSet.removeSingle ((Heuristic.changeHand st.hand)) st.hand} 
             let st_tile_add = {st_tile_removed with hand = MultiSet.addSingle (fst ls.[0]) st_tile_removed.hand} 
             st_tile_add
         | RCM (CMGameOver _) -> {st with active=false}

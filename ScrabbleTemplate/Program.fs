@@ -57,9 +57,9 @@ let main argv =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict words dictAPI)
     //let players = [("Bob", Cthulhu.Scrabble.startGame), ("OxyFis", Oxyphenbutazone.Scrabble.startGame)]
 
-    let players_0 = spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 1
+    //let players_0 = spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 1
     let players_1 = spawnMultiples "Bob" dictionary Cthulhu.Scrabble.startGame 1
-    let players = players_0 @ players_1
+    let players = players_1 // @ players_1
 
     do ScrabbleServer.Comm.startGame 
           board dictionary handSize timeout tiles seed port players
