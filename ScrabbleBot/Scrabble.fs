@@ -87,7 +87,6 @@ module Scrabble =
         printfn "Chosen word: %A" chosen_word        
         //let _ = System.Console.ReadLine()
         
-        printf "placedChars %A" st.placedChars
 
         match chosen_word with
         | None ->

@@ -216,33 +216,32 @@ module internal Heuristic =
 
         let rec traverseUp x y acc =
             match Map.tryFind (x,y) placedChars with
-            | Some cid -> traverseLeft x (y-1) ((getChar cid)::acc)
+            | Some cid -> traverseUp x (y-1) ((getChar cid)::acc)
             | None -> acc
 
         let rec traverseDown x y acc =
             match Map.tryFind (x,y) placedChars with
-            | Some cid -> traverseLeft x (y+1) ((getChar cid)::acc)
+            | Some cid -> traverseDown x (y+1) ((getChar cid)::acc)
             | None -> acc
         
         let tryPlace cid prev co = 
-            printf "Trying to place %A at coordinat %A\n" cid co
             match prev with
             | Some x -> Some x
             | None -> 
-                let lw = traverseLeft ((fst co) + 1) (snd co) []
+                let lw = traverseLeft ((fst co) - 1) (snd co) []
                 let rw = traverseRight ((fst co) + 1) (snd co) [] |> List.rev
                 let w_l1 = lw @ ((getChar cid)::rw)
                 let w1 = if (List.length w_l1) > 1 then System.String.Concat(Array.ofList(w_l1))  else "YAWS"
-                printf "\t making word %A %A %A\n" lw rw w1
                 match Dictionary.lookup w1 dic with
                 | true -> 
                     let uw = traverseUp (fst co) ((snd co) - 1) []
                     let dw = traverseDown (fst co) ((snd co) + 1) [] |> List.rev
                     let w_l2 = uw @ ((getChar cid)::dw)
                     let w2 = if (List.length w_l2) > 1 then System.String.Concat(Array.ofList(w_l2))  else "HELLO"
-                    printf "\t\t making word %A %A %A\n" uw dw w2
                     match Dictionary.lookup w2 dic with
-                    | true -> Some co
+                    | true -> 
+                        printf "Found words: %A %A at coordinate %A\n" w1 w2 co
+                        Some co
                     | false -> None
                 | false -> None
                 
