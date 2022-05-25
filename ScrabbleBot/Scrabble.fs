@@ -74,7 +74,6 @@ module Scrabble =
 
     let playTurn (st: State.state) cstream pieces = 
     
-        st.board.center |> printfn "center: %A"
         Print.printHand pieces st.hand
 
         let chosen_word =
@@ -84,7 +83,6 @@ module Scrabble =
                 let candidates = Heuristic.findAnchorPoints st.placedChars
                 Heuristic.chooseWord candidates st.dict st.hand true
 
-        printfn "Chosen word: %A" chosen_word        
         //let _ = System.Console.ReadLine()
         
 
@@ -92,8 +90,6 @@ module Scrabble =
         | None ->
             System.Threading.Thread.Sleep 100
             let ans = Heuristic.panicFind st.hand st.placedChars st.dict
-            printf "Panicked and found %A" ans
-            let _ = System.Console.ReadLine()
             match ans with
             | None -> 
                 send cstream (SMChange [(Heuristic.changeHand st.hand)])

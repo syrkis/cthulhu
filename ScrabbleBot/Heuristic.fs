@@ -175,7 +175,9 @@ module internal Heuristic =
 
         tile_placements
 
-    let playFirstTurn (centerCoord: int*int) hand (dic: Dictionary.Dict) = 
+    let playFirstTurn (centerCoord: int*int) hand' (dic: Dictionary.Dict) = 
+        let hand = MultiSet.remove 0u 7u hand'
+
         let folderFunc best_word cid _ = 
             let anchorPoint = Map.ofList [(centerCoord, (cid, 7, direction.Right))]
             let best_anchor_word = chooseWord anchorPoint dic (MultiSet.removeSingle cid hand) true
@@ -240,7 +242,6 @@ module internal Heuristic =
                     let w2 = if (List.length w_l2) > 1 then System.String.Concat(Array.ofList(w_l2))  else "HELLO"
                     match Dictionary.lookup w2 dic with
                     | true -> 
-                        printf "Found words: %A %A at coordinate %A\n" w1 w2 co
                         Some co
                     | false -> None
                 | false -> None

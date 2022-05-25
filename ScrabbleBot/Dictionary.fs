@@ -17,7 +17,6 @@ module Dictionary
             Node (b, s, Map.add x.[0] (insert x.[1..] existing) d)
 
     let rec lookup (x: string) dic =
-        printf "lookup is called\n"
         match dic with
         | Leaf (b, _) when x.Equals "" -> b
         | Node (b, _, _) when x.Equals "" -> b
