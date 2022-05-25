@@ -6,7 +6,6 @@ open ScrabbleUtil.ServerCommunication
 open System.IO
 
 open ScrabbleUtil.DebugPrint
-
 // The RegEx module is only used to parse human input. It is not used for the final product.
 
 module RegEx =
@@ -42,7 +41,7 @@ module State =
     // information, such as number of players, player turn, etc.
 
     type state = {
-        placedChars   : Map<coord, uint32> 
+        placedChars   : Map<coord, uint32>
         board         : Parser.board
         dict          : ScrabbleUtil.Dictionary.Dict
         playerNumber  : uint32
@@ -74,17 +73,14 @@ module Scrabble =
 
     let playTurn (st: State.state) cstream pieces = 
     
-        Print.printHand pieces st.hand
+        // Print.printHand pieces st.hand
 
         let chosen_word =
             match st.placedChars.IsEmpty with
             | true -> Heuristic.playFirstTurn st.board.center st.hand st.dict
             | false ->
-                let candidates = Heuristic.findAnchorPoints st.placedChars
+                let candidates = Heuristic.findAnchorPoints st.placedChars st.board.squares
                 Heuristic.chooseWord candidates st.dict st.hand true
-
-        //let _ = System.Console.ReadLine()
-        
 
         match chosen_word with
         | None ->
@@ -100,7 +96,7 @@ module Scrabble =
         | Some (co, wo, dir) -> 
             let move = Heuristic.formatMove co wo dir st.placedChars.IsEmpty
             send cstream (SMPlay move)
-            printf "Player %d -> Server:\n%A\n" (State.playerNumber st) move // keep the debug lines. They are useful.
+            // printf "Player %d -> Server:\n%A\n" (State.playerNumber st) move // keep the debug lines. They are useful.
 
         let msg = recv cstream
 
@@ -125,11 +121,11 @@ module Scrabble =
         | RCM (CMGameOver _) -> {st with active=false}
         | RCM _ -> st
         //| RCM a -> failwith (sprintf "not implmented: %A" a)
-        | RGPE err -> printfn "Gameplay Error:\n%A" err; st
+        | RGPE err -> st //printfn "Gameplay Error:\n%A" err; st
 
     let passTurn (st: State.state) cstream pieces = 
         let msg = recv cstream
-        printf "Player %d <- Server:\n%A\n" (State.playerNumber st) msg // keep the debug lines. They are useful.
+        // printf "Player %d <- Server:\n%A\n" (State.playerNumber st) msg // keep the debug lines. They are useful.
 
         match msg with
         | RCM (CMPlayed (pid, ms, points)) ->
@@ -143,7 +139,7 @@ module Scrabble =
         | RCM (CMChange _) -> st
         | RCM _ -> st
         //| RCM a -> failwith (sprintf "not implmented: %A" a)
-        | RGPE err -> printfn "Gameplay Error:\n%A" err; st
+        | RGPE err -> st // printfn "Gameplay Error:\n%A" err; st
         
 
     let playGame cstream pieces (st : State.state) =
@@ -168,17 +164,17 @@ module Scrabble =
             (timeout : uint32 option) 
             (cstream : Stream) =
         
-        printf "Starting game!
-                    number of players = %d
-                    player id = %d
-                    player turn = %d
-                    hand =  %A
-                    timeout = %A\n\n" numPlayers playerNumber playerTurn hand timeout
+        // printf "Starting game!
+        //             number of players = %d
+        //             player id = %d
+        //             player turn = %d
+        //             hand =  %A
+        //             timeout = %A\n\n" numPlayers playerNumber playerTurn hand timeout
 
         //let dict = dictf true // Uncomment if using a gaddag for your dictionary
         let dict = dictf false // Uncomment if using a trie for your dictionary
         let board = Parser.mkBoard boardP
-                  
+
         let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
 
         fun () -> playGame cstream tiles (State.mkState board dict playerNumber handSet playerTurn numPlayers)
